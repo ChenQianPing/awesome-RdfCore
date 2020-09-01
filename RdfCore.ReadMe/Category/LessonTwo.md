@@ -2,9 +2,10 @@
 - [1.新增操作](#1新增操作)
 - [2.获取实体集合](#2获取实体集合)
 - [3.分页获取实体的列表](#3分页获取实体的列表)
-- 4.获取单个实体
-- 5.更新操作
-- 6.批量删除操作
+- [4.获取单个实体](#4获取单个实体)
+- [5.更新操作](#5更新操作)
+- [6.批量删除操作](#6批量删除操作)
+- [7.自定义Sql查询](#7自定义Sql查询)
 
 ## 1.新增操作
 ```
@@ -134,3 +135,22 @@ public async Task<int> BatchDeleteRole(BatchDeleteInput<string> input, string te
 }
 ```
 
+## 7.自定义Sql查询
+```
+public async Task<IEnumerable<GetDetailRoleOutput>> GetAllRole2(string tenantId, string userId)
+{
+    #region sqlQuery
+    var sqlQuery = $@"SELECT T1.ROLE_ID RoleId
+            ,T1.ROLE_NAME RoleName
+            ,T1.ROLE_TYPE RoleType
+            ,T1.ROLE_DESC RoleDesc
+            ,T1.IS_STATIC IsStatic
+            ,T1.IS_DEFAULT IsDefault
+            ,T1.DISP_ORDER DispOrder
+        FROM ACT_ROLE T1
+        ORDER BY T1.DISP_ORDER";
+    #endregion
+
+    return await SqlQueryAsync<GetDetailRoleOutput>(sqlQuery);
+}
+```
