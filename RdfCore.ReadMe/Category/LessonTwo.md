@@ -6,6 +6,7 @@
 - [5.更新操作](#5更新操作)
 - [6.批量删除操作](#6批量删除操作)
 - [7.自定义Sql查询](#7自定义Sql查询)
+- [8.多表分页组合条件查询](#8多表分页组合条件查询)
 
 ## 1.新增操作
 ```
@@ -152,5 +153,96 @@ public async Task<IEnumerable<GetDetailRoleOutput>> GetAllRole2(string tenantId,
     #endregion
 
     return await SqlQueryAsync<GetDetailRoleOutput>(sqlQuery);
+}
+```
+
+## 8.多表分页组合条件查询
+```
+public PageOutput GetPageUser2(GetPageUserInput input, string tenantId, string userId)
+{
+    /*
+        * 五表查询例子 st, sc, st2, st3, st4；
+        * 多表分页查询示例
+        */
+    var where = " 1 = 1";
+
+    if (!string.IsNullOrEmpty(input.Keyword))
+        where += $@" AND st.USER_NAME LIKE '%'||'{input.Keyword}'||'%'";
+
+    if (!string.IsNullOrEmpty(input.RoleId))
+        where += $@" AND st2.ROLE_ID = '{input.RoleId}'";
+
+    if (string.IsNullOrEmpty(input.OrderBy))
+        input.OrderBy = "st.DISP_ORDER";
+
+    if (input.PageIndex == 0)
+        input.PageIndex = 1;
+
+    if (input.PageSize == 0)
+        input.PageIndex = 10;
+
+    var totalCount = 0;
+    var lstResult = _db.Queryable<User, UserRole, Role>((st, sc, st2) => new object[] { JoinType.Inner, st.UserId == sc.UserId, JoinType.Inner, sc.RoleId == st2.RoleId })
+        .Where(where)
+        .Select((st, sc, st2) => new GetDetailUserOutput
+        {
+            UserId = st.UserId,
+            UserName = st.UserName,
+            OrgId = st.OrgId,
+            FullName = st.FullName,
+            Password = st.Password,
+            HashType = st.HashType,
+            RndNo = st.RndNo,
+            Phone = st.Phone,
+            EmailAddress = st.EmailAddress,
+            IsEmailConfirmed = st.IsEmailConfirmed,
+            EmailConfirmationCode = st.EmailConfirmationCode,
+            PasswordResetCode = st.PasswordResetCode,
+            LastLoginTime = st.LastLoginTime,
+            LoginIp = st.LoginIp,
+            UserType = st.UserType,
+            IsActive = st.IsActive,
+            TenantId = st.TenantId,
+            DispOrder = st.DispOrder,
+            IsDeleted = st.IsDeleted,
+            DeleterUserId = st.DeleterUserId,
+            DeletionTime = st.DeletionTime,
+            LastModifierUserId = st.LastModifierUserId,
+            LastModificationTime = st.LastModificationTime,
+            CreatorUserId = st.CreatorUserId,
+            CreationTime = st.CreationTime
+        })
+        .OrderByIF(!string.IsNullOrEmpty(input.OrderBy), input.OrderBy)
+        .ToPageList(input.PageIndex, input.PageSize, ref totalCount);
+
+    var output = new PageOutput
+    {
+        Total = totalCount,
+        Records = lstResult
+    };
+
+    return output;
+}
+```
+
+## 9.事务操作
+```
+public bool BatchDeleteUser(BatchDeleteInput<string> input, string tenantId, string userId)
+{
+    var result = _db.Ado.UseTran(() =>
+    {
+        // 这里写你的逻辑
+        _db.Deleteable<UserRole>(p => input.Ids.Contains(p.UserId)).EnableDiffLogEvent().ExecuteCommand();
+        _db.Deleteable<User>(p => input.Ids.Contains(p.UserId)).EnableDiffLogEvent().ExecuteCommand();
+    });
+    if (result.IsSuccess)
+    {
+        // 成功
+        return result.IsSuccess;
+    }
+    else
+    {
+        throw new CustomException(result.ErrorMessage);
+    }            
 }
 ```
